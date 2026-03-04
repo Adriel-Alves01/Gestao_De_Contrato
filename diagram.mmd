@@ -1,0 +1,54 @@
+erDiagram
+    USER ||--o{ CONTRACT : manages
+    CONTRACT ||--o{ MEASUREMENT : has
+    MEASUREMENT ||--|{ PAYMENT : generates
+    CONTRACT ||--o{ ATTACHMENT : has
+    CONTRACT ||--o{ CONTRACTSTATUSHISTORY : logs
+
+    USER {
+        int id
+        string username
+        ...
+    }
+    CONTRACT {
+        int id
+        string title
+        decimal total_value
+        decimal remaining_balance
+        date start_date
+        date end_date
+        enum status (ACTIVE, CLOSED)
+        FK manager (User)
+    }
+    MEASUREMENT {
+        int id
+        FK contract
+        decimal value
+        enum status (PENDING, APPROVED, REJECTED)
+    }
+    PAYMENT {
+        int id
+        FK measurement
+        decimal value
+        enum status (PENDING, PAID, FAILED)
+        FK created_by (User)
+    }
+    ATTACHMENT {
+        int id
+        FK contract
+        string file
+    }
+    CONTRACTSTATUSHISTORY {
+        int id
+        FK contract
+        string status
+        datetime changed_at
+    }
+
+    %% Regras principais
+    %% - Só 1 pagamento por medição
+    %% - Só medições aprovadas geram pagamento
+    %% - Contrato fechado bloqueia novas medições
+    %% - Não pode aprovar duas vezes
+    %% - Não pode pagar medição rejeitada
+    %% - Pagamento pode ser FAILED em caso de erro
