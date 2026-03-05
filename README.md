@@ -2,6 +2,17 @@
 
 Sistema de **Contract Lifecycle Management** com backend em Django REST e frontend em Next.js.
 
+## Demo online
+- Frontend (Vercel): **https://gestao-de-contrato.vercel.app**
+- Backend API base (Render): **https://gestao-de-contrato-api.onrender.com**
+- Swagger/OpenAPI: `https://gestao-de-contrato-api.onrender.com/api/docs/`
+
+### Acesso de demonstração
+- Usuário: **Usuario_Teste**
+- Senha: **Teste124**
+
+> Se o serviço estiver em plano free, o primeiro acesso pode demorar alguns segundos (cold start).
+
 ## Stack
 - Backend: Django 6 + DRF + SimpleJWT
 - Frontend: Next.js 16 + TypeScript + Tailwind/shadcn
