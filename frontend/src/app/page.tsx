@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 import { AppShell } from "@/components/layout/app-shell"
 import { Badge } from "@/components/ui/badge"
@@ -10,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { OverviewCards } from "@/features/dashboard/components/overview-cards"
 import { RecentContractsTable } from "@/features/dashboard/components/recent-contracts-table"
 import { RecentPaymentsTable } from "@/features/dashboard/components/recent-payments-table"
-import { getCurrentUser } from "@/services/api/auth"
+import { clearTokens, getCurrentUser } from "@/services/api/auth"
 import { getAnalyticsOverview, type AnalyticsOverviewResponse } from "@/services/api/analytics"
 
 function formatMoney(value: string) {
@@ -43,6 +44,7 @@ function DashboardCardsSkeleton() {
 }
 
 export default function Home() {
+  const router = useRouter()
   const [isFinancialUser, setIsFinancialUser] = useState(false)
   const [overview, setOverview] = useState<AnalyticsOverviewResponse | null>(null)
   const [isDashboardContextLoading, setIsDashboardContextLoading] = useState(true)
@@ -59,15 +61,17 @@ export default function Home() {
         setIsFinancialUser(isFinancial)
         setOverview(overviewData)
       } catch {
+        clearTokens()
         setIsFinancialUser(false)
         setOverview(null)
+        router.replace("/login")
       } finally {
         setIsDashboardContextLoading(false)
       }
     }
 
     void loadDashboardContext()
-  }, [])
+  }, [router])
 
   const cards = useMemo(() => {
     if (!overview) {
