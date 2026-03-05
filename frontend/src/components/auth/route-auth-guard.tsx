@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 
-import { clearTokens, getCurrentUser } from "@/services/api/auth"
+import { clearTokens, getAccessToken, getCurrentUser } from "@/services/api/auth"
 
 interface RouteAuthGuardProps {
   children: React.ReactNode
@@ -18,6 +18,13 @@ export function RouteAuthGuard({ children }: RouteAuthGuardProps) {
     const isPublicRoute = pathname === "/login"
 
     if (isPublicRoute) {
+      setIsCheckingAuth(false)
+      return
+    }
+
+    const accessToken = getAccessToken()
+    if (!accessToken) {
+      router.replace("/login")
       setIsCheckingAuth(false)
       return
     }
