@@ -62,11 +62,11 @@ npm run build
 
 ## Deploy (resumo)
 - Frontend: Vercel
-- Backend: Render ou Railway
+- Backend: Render 
 - Banco: PostgreSQL gerenciado
-- Configurar variáveis no provedor (não commitar segredos)
+- Configurar variáveis no provedor
 
-## Observações para portfólio
+## Observações
 - Projeto com regras de negócio reais (RBAC + auditoria + fluxo financeiro)
 - Testes automatizados cobrindo cenários de sucesso e erro
 - Interface web com foco em operação por perfil
