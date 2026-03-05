@@ -28,7 +28,7 @@ export function AppShell({ children }: AppShellProps) {
   const pathname = usePathname()
 
   return (
-    <div className="min-h-screen bg-muted/20">
+    <div className="min-h-screen bg-secondary/45">
       <AppHeader />
 
       <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 px-6 py-6 md:grid-cols-[220px_1fr]">
