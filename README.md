@@ -20,12 +20,21 @@ Sistema de **Contract Lifecycle Management** com backend em Django REST e fronte
 
 ## Funcionalidades principais
 - CRUD de contratos com fechamento e auditoria
-- Fluxo de medições (criar, aprovar, rejeitar, reabrir)
-- Fluxo de pagamentos com regras de negócio
+- **Upload de PDF com extração automática de dados via IA** (OpenAI GPT-4o-mini e Google Gemini como fallback)
+- Campos de CNPJ e razão social de contratante/contratada nos contratos
+- Fluxo de medições (criar, aprovar, rejeitar, reabrir) com datas de início/fim e controle de saldo
+- Fluxo de pagamentos com regras de negócio e campos de Nota Fiscal (número, data, valor)
 - **Pagamento automático ao aprovar medição**
 - Controle por papéis (ADMIN, GESTOR, FINANCEIRO, FORNECEDOR)
-- Dashboard com visões por papel
+- Dashboard com visões por papel, alertas de vencimento e tabela de contratos recentes clicável
+- Histórico de status, logs de auditoria e soft delete
+- Geração de relatórios em PDF
 - API documentada (Swagger/OpenAPI)
+
+## Variáveis de ambiente da IA (opcionais)
+- OPENAI_API_KEY -- chave da OpenAI
+- GOOGLE_API_KEY -- chave do Google Gemini (fallback automático)
+- USE_MOCK_DATA=true -- retorna dados de teste sem consumir API
 
 ## Estrutura do projeto
 - `core/` configuração Django
