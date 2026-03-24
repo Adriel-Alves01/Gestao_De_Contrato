@@ -220,7 +220,12 @@ class ContractViewSet(viewsets.ModelViewSet):
         # Combina permissões: exige autenticação sempre e aplica checks
         # de RBAC via `IsAdminOrManager` para métodos de escrita.
         perms = [IsAuthenticated()]
-        if self.request.method not in ("GET", "HEAD", "OPTIONS"):
+        # extract_from_pdf acessível a qualquer autenticado
+        open_actions = ("extract_from_pdf",)
+        if (
+            self.request.method not in ("GET", "HEAD", "OPTIONS")
+            and getattr(self, "action", None) not in open_actions
+        ):
             perms.append(IsAdminOrManager())
         return perms
 
