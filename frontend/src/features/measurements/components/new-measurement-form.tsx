@@ -1,23 +1,28 @@
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { getContract } from "@/services/api/contracts"
 import { createMeasurement } from "@/services/api/measurements"
 
 interface MeasurementFormState {
   contract: string
   description: string
   value: string
+  start_date: string
+  end_date: string
 }
 
 const initialFormState: MeasurementFormState = {
   contract: "",
   description: "",
   value: "",
+  start_date: "",
+  end_date: "",
 }
 
 function parseMoneyInput(value: string): number | null {
@@ -46,9 +51,50 @@ function parseMoneyInput(value: string): number | null {
 
 export function NewMeasurementForm() {
   const router = useRouter()
-  const [formData, setFormData] = useState<MeasurementFormState>(initialFormState)
+  const searchParams = useSearchParams()
+  const contractParam = searchParams.get("contract") ?? ""
+
+  const [formData, setFormData] = useState<MeasurementFormState>({
+    ...initialFormState,
+    contract: contractParam,
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [contractTitle, setContractTitle] = useState<string | null>(null)
+  const [remainingBalance, setRemainingBalance] = useState<number | null>(null)
+  const [contractTitleLoading, setContractTitleLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const contractId = Number(formData.contract)
+
+    if (!Number.isInteger(contractId) || contractId <= 0) {
+      setContractTitle(null)
+      return
+    }
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      setContractTitleLoading(true)
+      try {
+        const contract = await getContract(contractId)
+        setContractTitle(contract.title)
+        setRemainingBalance(Number(contract.remaining_balance))
+      } catch {
+        setContractTitle(null)
+        setRemainingBalance(null)
+      } finally {
+        setContractTitleLoading(false)
+      }
+    }, 500)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [formData.contract])
 
   const handleFieldChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -77,6 +123,19 @@ export function NewMeasurementForm() {
       return
     }
 
+    if (remainingBalance !== null && parsedValue > remainingBalance) {
+      setError(
+        `O valor da medição (${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(parsedValue)}) ` +
+        `é maior que o saldo restante do contrato (${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(remainingBalance)}).`
+      )
+      return
+    }
+
+    if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
+      setError("A data de fim não pode ser anterior à data de início.")
+      return
+    }
+
     try {
       setIsSubmitting(true)
 
@@ -84,9 +143,11 @@ export function NewMeasurementForm() {
         contract: parsedContractId,
         description: formData.description,
         value: parsedValue,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null,
       })
 
-      router.push("/measurements")
+      router.push(contractParam ? `/contracts/${contractParam}` : "/measurements")
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -110,6 +171,7 @@ export function NewMeasurementForm() {
         </CardHeader>
         <CardContent>
           <form className="space-y-5" onSubmit={handleSubmit}>
+            {/* Linha 1: Contrato ID + Título */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="space-y-2">
                 <span className="text-sm font-medium">Contrato (ID) *</span>
@@ -121,26 +183,79 @@ export function NewMeasurementForm() {
                   name="contract"
                   value={formData.contract}
                   onChange={handleFieldChange}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  readOnly={!!contractParam}
+                  className={`h-10 w-full rounded-md border px-3 text-sm ${
+                    contractParam
+                      ? "bg-muted text-muted-foreground cursor-not-allowed"
+                      : "bg-background"
+                  }`}
                   placeholder="Ex.: 12"
                 />
               </label>
 
+              <div className="space-y-2">
+                <span className="text-sm font-medium">Título do contrato</span>
+                <div className="flex h-10 w-full items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
+                  {contractTitleLoading ? (
+                    <span className="italic">Buscando...</span>
+                  ) : contractTitle ? (
+                    <span className="truncate">{contractTitle}</span>
+                  ) : (
+                    <span className="italic opacity-60">Preenchido automaticamente</span>
+                  )}
+                </div>
+                {remainingBalance !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    Saldo restante:{" "}
+                    <span className="font-medium text-foreground">
+                      {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(remainingBalance)}
+                    </span>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Linha 2: Início + Fim */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <label className="space-y-2">
-                <span className="text-sm font-medium">Valor *</span>
+                <span className="text-sm font-medium">Início</span>
                 <input
-                  required
-                  type="text"
-                  inputMode="decimal"
-                  name="value"
-                  value={formData.value}
+                  type="date"
+                  name="start_date"
+                  value={formData.start_date}
                   onChange={handleFieldChange}
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  placeholder="Ex.: 50000 ou 50.000,00"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Fim</span>
+                <input
+                  type="date"
+                  name="end_date"
+                  value={formData.end_date}
+                  onChange={handleFieldChange}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
                 />
               </label>
             </div>
 
+            {/* Linha 3: Valor */}
+            <label className="block space-y-2 md:max-w-xs">
+              <span className="text-sm font-medium">Valor *</span>
+              <input
+                required
+                type="text"
+                inputMode="decimal"
+                name="value"
+                value={formData.value}
+                onChange={handleFieldChange}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                placeholder="Ex.: 50000 ou 50.000,00"
+              />
+            </label>
+
+            {/* Linha 4: Descrição */}
             <label className="space-y-2">
               <span className="text-sm font-medium">Descrição</span>
               <textarea
@@ -163,7 +278,10 @@ export function NewMeasurementForm() {
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Salvando..." : "Salvar medição"}
               </Button>
-              <Link href="/measurements" className={buttonVariants({ variant: "outline" })}>
+              <Link
+                href={contractParam ? `/contracts/${contractParam}` : "/measurements"}
+                className={buttonVariants({ variant: "outline" })}
+              >
                 Cancelar
               </Link>
             </div>

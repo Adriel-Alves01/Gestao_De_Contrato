@@ -12,12 +12,16 @@ export interface MeasurementCreatePayload {
   contract: number
   description?: string
   value: number
+  start_date?: string | null
+  end_date?: string | null
 }
 
 export interface MeasurementUpdatePayload {
   contract?: number
   description?: string
   value?: number
+  start_date?: string | null
+  end_date?: string | null
 }
 
 export interface MeasurementActionResponse {

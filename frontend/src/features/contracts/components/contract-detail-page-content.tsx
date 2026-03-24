@@ -8,10 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useCurrentUser } from "@/hooks/use-current-user"
-import { closeContract, deleteContract, getContract } from "@/services/api/contracts"
+import { closeContract, deleteContract, getContract, listContractAttachments } from "@/services/api/contracts"
 import { listMeasurementsByContract } from "@/services/api/measurements"
 import { listPaymentsByContract } from "@/services/api/payments"
-import type { ContractSummary } from "@/types/contracts"
+import type { ContractAttachment, ContractSummary } from "@/types/contracts"
 import type { MeasurementSummary } from "@/types/measurements"
 import type { PaymentSummary } from "@/types/payments"
 
@@ -31,12 +31,13 @@ function formatMoney(value: string) {
   }).format(parsedValue)
 }
 
-function formatDate(value: string) {
-  const parsedDate = new Date(value)
-  if (Number.isNaN(parsedDate.getTime())) {
-    return value
-  }
-
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—"
+  // Datas sem horário (YYYY-MM-DD) devem ser interpretadas como horário local
+  const parsedDate = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T00:00:00`)
+    : new Date(value)
+  if (Number.isNaN(parsedDate.getTime())) return value
   return new Intl.DateTimeFormat("pt-BR").format(parsedDate)
 }
 
@@ -47,6 +48,12 @@ function getManagerName(contract: ContractSummary) {
 
   const fullName = `${contract.manager.first_name} ${contract.manager.last_name}`.trim()
   return fullName || contract.manager.username
+}
+
+function formatMeasurementStatusLabel(status: MeasurementSummary["status"]) {
+  if (status === "APPROVED") return "Aprovada"
+  if (status === "REJECTED") return "Rejeitada"
+  return "Pendente"
 }
 
 function getPaymentStatusInfo(
@@ -94,6 +101,7 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
   const [paymentsByMeasurementId, setPaymentsByMeasurementId] = useState<
     Record<number, PaymentSummary>
   >({})
+  const [attachments, setAttachments] = useState<ContractAttachment[]>([])
   const [isLoadingMeasurements, setIsLoadingMeasurements] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -122,8 +130,9 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
       setIsClosing(true)
       setError(null)
 
-      const updatedContract = await closeContract(Number(contractId))
-      setContract(updatedContract)
+      await closeContract(Number(contractId))
+      const refreshed = await getContract(Number(contractId))
+      setContract(refreshed)
     } catch (closeError) {
       setError(
         closeError instanceof Error
@@ -143,10 +152,11 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
         setError(null)
 
         const parsedId = Number(contractId)
-        const [contractData, measurementsData, paymentsData] = await Promise.all([
+        const [contractData, measurementsData, paymentsData, attachmentsData] = await Promise.all([
           getContract(parsedId),
           listMeasurementsByContract(parsedId),
           listPaymentsByContract(parsedId),
+          listContractAttachments(parsedId),
         ])
 
         const paymentsMap = paymentsData.reduce<Record<number, PaymentSummary>>(
@@ -160,6 +170,7 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
         setContract(contractData)
         setMeasurements(measurementsData)
         setPaymentsByMeasurementId(paymentsMap)
+        setAttachments(attachmentsData)
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -268,15 +279,45 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {contract.numero_contrato ? (
+              <div>
+                <p className="text-xs text-muted-foreground">Número do contrato</p>
+                <p className="text-sm font-medium">{contract.numero_contrato}</p>
+              </div>
+            ) : null}
             <div>
               <p className="text-xs text-muted-foreground">Gestor</p>
               <p className="text-sm font-medium">{getManagerName(contract)}</p>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-xs text-muted-foreground">Vigência</p>
-              <p className="text-sm font-medium">
-                {formatDate(contract.start_date)} até {formatDate(contract.end_date)}
-              </p>
+              <p className="text-xs text-muted-foreground">Empresa contratante</p>
+              <p className="text-sm font-medium">{contract.empresa_contratante || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">CNPJ contratante</p>
+              <p className="text-sm font-medium">{contract.cnpj_empresa_contratante || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Empresa contratada</p>
+              <p className="text-sm font-medium">{contract.empresa_contratada || "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">CNPJ contratada</p>
+              <p className="text-sm font-medium">{contract.cnpj_empresa_contratada || "—"}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Início da vigência</p>
+              <p className="text-sm font-medium">{formatDate(contract.start_date)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Fim da vigência</p>
+              <p className="text-sm font-medium">{formatDate(contract.end_date)}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Valor total</p>
@@ -292,6 +333,43 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
             <p className="text-xs text-muted-foreground">Descrição</p>
             <p className="text-sm">{contract.description || "Sem descrição"}</p>
           </div>
+
+          <div className="border-t pt-3">
+            <p className="text-xs text-muted-foreground">Criado em</p>
+            <p className="text-sm font-medium">{formatDate(contract.created_at)}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle>Anexos</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {attachments.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum anexo cadastrado para este contrato.</p>
+          ) : (
+            <ul className="space-y-2">
+              {attachments.map((att) => (
+                <li key={att.id} className="flex items-center justify-between rounded-lg border px-4 py-2">
+                  <div>
+                    <p className="text-sm font-medium">{att.file_name ?? `Anexo #${att.id}`}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Enviado por {att.uploaded_by_name} em {formatDate(att.created_at)}
+                    </p>
+                  </div>
+                  <a
+                    href={att.file}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Baixar
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
@@ -349,7 +427,7 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
                           <Badge
                             variant={measurement.status === "APPROVED" ? "default" : "secondary"}
                           >
-                            {measurement.status}
+                            {formatMeasurementStatusLabel(measurement.status)}
                           </Badge>
                         </td>
                         <td className="py-3">
@@ -364,6 +442,17 @@ export function ContractDetailPageContent({ contractId }: ContractDetailPageCont
                   })}
                 </tbody>
               </table>
+            </div>
+          ) : null}
+
+          {!isFinancialUser ? (
+            <div className="pt-2">
+              <Link
+                href={`/measurements/new?contract=${contractId}`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                + Criar nova medição
+              </Link>
             </div>
           ) : null}
         </CardContent>

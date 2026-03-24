@@ -435,7 +435,8 @@ class TestE2EPaymentErrors:
         # 3. FINANCEIRO tenta criar pagamento manual (bloqueado)
         api_client.force_authenticate(user=financeiro)
 
-        assert Payment.objects.filter(measurement_id=measurement_id).count() == 0
+        assert Payment.objects.filter(
+            measurement_id=measurement_id).count() == 0
         payment_data = {
             "contract": contract_id,
             "measurement": measurement_id,
@@ -519,7 +520,8 @@ class TestE2EPaymentErrors:
         api_client.post(f"/api/v1/measurements/{measurement_id}/approve/", {})
 
         # 3. Aprovação gera exatamente um pagamento automático
-        assert Payment.objects.filter(measurement_id=measurement_id).count() == 1
+        assert Payment.objects.filter(
+            measurement_id=measurement_id).count() == 1
 
         # 4. FINANCEIRO tenta criar pagamento manual (erro)
         api_client.force_authenticate(user=financeiro)

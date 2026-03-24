@@ -121,9 +121,8 @@ export function PaymentsPageContent() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">ID</th>
                     <th className="pb-3 font-medium">Contrato</th>
-                    <th className="pb-3 font-medium">Medição</th>
+                    <th className="pb-3 font-medium">Descrição</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">Criado em</th>
                     <th className="pb-3 text-right font-medium">Valor</th>
@@ -136,9 +135,18 @@ export function PaymentsPageContent() {
                       className="cursor-pointer border-b transition-colors hover:bg-muted/50 last:border-0"
                       onClick={() => router.push(`/payments/${payment.id}`)}
                     >
-                      <td className="py-3 font-medium">#{payment.id}</td>
-                      <td className="py-3">#{payment.contract}</td>
-                      <td className="py-3">#{payment.measurement}</td>
+                      <td className="py-3 font-medium">
+                        {(() => {
+                          const t = payment.contract_title ?? `#${payment.contract}`
+                          return t.length > 50 ? `${t.slice(0, 50)}...` : t
+                        })()}
+                      </td>
+                      <td className="py-3">
+                        {(() => {
+                          const d = payment.measurement_description || "Sem descrição"
+                          return d.length > 50 ? `${d.slice(0, 50)}...` : d
+                        })()}
+                      </td>
                       <td className="py-3">
                         <Badge
                           variant={payment.status === "PAID" ? "default" : "secondary"}

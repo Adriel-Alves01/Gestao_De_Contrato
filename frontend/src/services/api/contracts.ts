@@ -1,5 +1,5 @@
 import { apiFetch } from "@/services/api/client"
-import type { ContractSummary } from "@/types/contracts"
+import type { ContractAttachment, ContractSummary } from "@/types/contracts"
 
 export interface ContractListResponse {
   count: number
@@ -16,6 +16,11 @@ export interface ContractCreatePayload {
   start_date: string
   end_date: string
   status?: "ACTIVE" | "CLOSED"
+  numero_contrato?: string | null
+  empresa_contratante?: string
+  empresa_contratada?: string
+  cnpj_empresa_contratada?: string
+  cnpj_empresa_contratante?: string
 }
 
 export interface ContractUpdatePayload {
@@ -26,6 +31,11 @@ export interface ContractUpdatePayload {
   start_date?: string
   end_date?: string
   status?: "ACTIVE" | "CLOSED"
+  numero_contrato?: string | null
+  empresa_contratante?: string
+  empresa_contratada?: string
+  cnpj_empresa_contratada?: string
+  cnpj_empresa_contratante?: string
 }
 
 interface ContractListQueryOptions {
@@ -66,11 +76,62 @@ export async function listContractsPaginated(
   return apiFetch<ContractListResponse>(`/api/v1/contracts/?${query}`)
 }
 
+export interface ContractExtractionResult {
+  title?: string | null
+  description?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  total_value?: number | null
+  parties?: string | string[] | null
+  numero_contrato?: string | null
+  empresa_contratante?: string | null
+  empresa_contratada?: string | null
+  cnpj_empresa_contratada?: string | null
+  cnpj_empresa_contratante?: string | null
+}
+
+export async function extractContractFromPdf(
+  file: File
+): Promise<ContractExtractionResult> {
+  const formData = new FormData()
+  formData.append("file", file)
+
+  return apiFetch<ContractExtractionResult>(
+    "/api/v1/contracts/extract-from-pdf/",
+    {
+      method: "POST",
+      body: formData,
+    }
+  )
+}
+
 export async function createContract(payload: ContractCreatePayload): Promise<ContractSummary> {
   return apiFetch<ContractSummary>("/api/v1/contracts/", {
     method: "POST",
     body: JSON.stringify(payload),
   })
+}
+
+export async function uploadContractAttachments(
+  contractId: number,
+  files: File[]
+): Promise<void> {
+  const formData = new FormData()
+  for (const file of files) {
+    formData.append("files", file)
+  }
+  await apiFetch<unknown>(`/api/v1/contracts/${contractId}/attachments/`, {
+    method: "POST",
+    body: formData,
+  })
+}
+
+export async function listContractAttachments(
+  contractId: number
+): Promise<ContractAttachment[]> {
+  return apiFetch<ContractAttachment[]>(
+    `/api/v1/contracts/${contractId}/attachments/list/`
+  )
 }
 
 export async function getContract(contractId: number): Promise<ContractSummary> {

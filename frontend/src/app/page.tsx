@@ -83,7 +83,10 @@ export default function Home() {
         {
           title: "Contratos Ativos",
           value: String(overview.contracts.active_contracts),
-          description: `${overview.contracts.total_contracts} contrato(s) visível(is) para você`,
+          description:
+            overview.contracts.total_contracts === 1
+              ? "1 contrato visível para você"
+              : `${overview.contracts.total_contracts} contratos visíveis para você`,
         },
         {
           title: "Medições Pendentes",
@@ -158,7 +161,7 @@ export default function Home() {
                   Ver pagamentos
                 </Link>
               ) : (
-                <Button>Novo contrato</Button>
+                <Link href="/contracts/new" className={buttonVariants()}>Novo contrato</Link>
               )}
               <Button variant="outline">Exportar relatório</Button>
             </div>

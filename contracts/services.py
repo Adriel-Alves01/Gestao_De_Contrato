@@ -108,8 +108,26 @@ class MeasurementService:
                 "Cannot approve a rejected measurement"
             )
 
+        # Regra: data final da medição não pode ultrapassar o fim do contrato
+        contract = measurement.contract
+        if measurement.end_date and contract.end_date and \
+                measurement.end_date > contract.end_date:
+            logger.warning(
+                f"Measurement #{measurement.id} end_date ({
+                    measurement.end_date}) "
+
+                f"exceeds contract #{contract.id} end_date ({
+                    contract.end_date})"
+            )
+            raise ValidationError(
+                f"A data final da medição ({
+                    measurement.end_date}) ultrapassou o prazo "
+                f"do contrato ({contract.end_date}). Não é possível aprovar."
+            )
+
         measurement.status = Measurement.Status.APPROVED
         measurement.approved_at = timezone.now()
+        measurement.approved_by = user
         measurement.save()
 
         # Atualiza o saldo do contrato
@@ -179,6 +197,7 @@ class MeasurementService:
 
         measurement.status = Measurement.Status.REJECTED
         measurement.rejected_at = timezone.now()
+        measurement.rejected_by = user
         measurement.save()
 
         # Registra no AuditLog
@@ -281,6 +300,43 @@ class PaymentService:
                 f"Payment #{payment.id} already marked as PAID"
             )
             raise ValidationError("Payment is already marked as paid")
+
+        # Regra: data final da medição não pode ultrapassar o fim do contrato
+        measurement = payment.measurement
+        if measurement and measurement.end_date and payment.contract.end_date:
+            if measurement.end_date > payment.contract.end_date:
+                logger.warning(
+                    f"Payment #{payment.id}: measurement end_date ({
+                        measurement.end_date}) "
+
+                    f"exceeds contract end_date ({payment.contract.end_date})"
+                )
+                raise ValidationError(
+                    f"A data final da medição ({
+                        measurement.end_date}) ultrapassou o prazo "
+
+                    f"do contrato ({
+                        payment.contract.end_date
+                        }). Não é possível efetuar o pagamento."
+                )
+
+        # Regra: valor da NF deve ser igual ao valor da medição
+        if payment.valor_nota_fiscal is not None and measurement:
+            from decimal import Decimal
+            nf_val = Decimal(str(payment.valor_nota_fiscal))
+            med_val = Decimal(str(measurement.value))
+            if nf_val != med_val:
+                logger.warning(
+                    f"Payment #{payment.id}: NF value ({nf_val}) != "
+                    f"measurement value ({med_val})"
+                )
+                raise ValidationError(
+                    f"O valor da Nota Fiscal (R$ {
+                        nf_val}) não corresponde ao valor "
+
+                    f"da medição (R$ {
+                        med_val}). Não é possível marcar como pago."
+                )
 
         payment.status = Payment.Status.PAID
         payment.paid_at = timezone.now()

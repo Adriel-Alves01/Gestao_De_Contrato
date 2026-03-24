@@ -1,5 +1,5 @@
 import { apiFetch } from "@/services/api/client"
-import type { PaymentSummary } from "@/types/payments"
+import type { NfExtractedData, PaymentSummary } from "@/types/payments"
 
 export interface PaymentListResponse {
   count: number
@@ -58,10 +58,12 @@ export async function getPayment(paymentId: number): Promise<PaymentSummary> {
 }
 
 export async function markPaymentAsPaid(
-  paymentId: number
+  paymentId: number,
+  nfFormData?: FormData
 ): Promise<PaymentActionResponse> {
   return apiFetch<PaymentActionResponse>(`/api/v1/payments/${paymentId}/mark-as-paid/`, {
     method: "POST",
+    body: nfFormData ?? undefined,
   })
 }
 
@@ -70,5 +72,14 @@ export async function markPaymentAsFailed(
 ): Promise<PaymentActionResponse> {
   return apiFetch<PaymentActionResponse>(`/api/v1/payments/${paymentId}/mark-as-failed/`, {
     method: "POST",
+  })
+}
+
+export async function extractNfData(file: File): Promise<NfExtractedData> {
+  const formData = new FormData()
+  formData.append("arquivo_nf", file)
+  return apiFetch<NfExtractedData>("/api/v1/payments/extract-nf/", {
+    method: "POST",
+    body: formData,
   })
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { env } from "@/config/env"
 import { Button } from "@/components/ui/button"
@@ -32,6 +33,11 @@ function formatMoney(value: string) {
   }).format(parsedValue)
 }
 
+function formatMonthYear(value: string) {
+  const [year, month] = value.split("-")
+  return `${month}/${year}`
+}
+
 function formatContractStatusLabel(status: ContractSummary["status"]) {
   if (status === "ACTIVE") {
     return "Ativo"
@@ -45,6 +51,7 @@ function formatContractStatusLabel(status: ContractSummary["status"]) {
 }
 
 export function RecentContractsTable() {
+  const router = useRouter()
   const { user, isLoadingUser } = useCurrentUser()
   const [contracts, setContracts] = useState<ContractSummary[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -136,13 +143,12 @@ export function RecentContractsTable() {
                 <th className="pb-3 font-medium">Gestor</th>
                 <th className="pb-3 font-medium">Status</th>
                 <th className="pb-3 font-medium">Vigência</th>
-                <th className="pb-3 text-right font-medium">Valor total</th>
               </tr>
             </thead>
             <tbody>
               {contracts.map((contract) => (
-                <tr key={contract.id} className="border-b transition-colors hover:bg-muted/50 last:border-0">
-                  <td className="py-3 font-medium">{contract.title}</td>
+                <tr key={contract.id} className="cursor-pointer border-b transition-colors hover:bg-muted/50 last:border-0" onClick={() => router.push(`/contracts/${contract.id}`)}>
+                  <td className="py-3 font-medium">{contract.title.length > 40 ? `${contract.title.slice(0, 40)}...` : contract.title}</td>
                   <td className="py-3">{getManagerName(contract)}</td>
                   <td className="py-3">
                     <Badge variant={contract.status === "ACTIVE" ? "default" : "secondary"}>
@@ -150,9 +156,8 @@ export function RecentContractsTable() {
                     </Badge>
                   </td>
                   <td className="py-3">
-                    {contract.start_date} até {contract.end_date}
+                    {formatMonthYear(contract.start_date)} até {formatMonthYear(contract.end_date)}
                   </td>
-                  <td className="py-3 text-right">{formatMoney(contract.total_value)}</td>
                 </tr>
               ))}
             </tbody>

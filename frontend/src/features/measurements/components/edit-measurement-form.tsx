@@ -19,6 +19,12 @@ interface MeasurementFormState {
   status: "PENDING" | "APPROVED" | "REJECTED"
 }
 
+function formatStatusLabel(status: string): string {
+  if (status === "APPROVED") return "Aprovada"
+  if (status === "REJECTED") return "Rejeitada"
+  return "Pendente"
+}
+
 function parseMoneyInput(value: string): number | null {
   const rawValue = value.trim().replace(/\s/g, "")
   if (!rawValue) {
@@ -165,7 +171,7 @@ export function EditMeasurementForm({ measurementId }: EditMeasurementFormProps)
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Esta medição está {formData.status} e não pode ser editada.
+              Esta medição está {formatStatusLabel(formData.status)} e não pode ser editada.
             </p>
 
             <div className="flex items-center gap-2">

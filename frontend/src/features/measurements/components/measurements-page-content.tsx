@@ -223,7 +223,6 @@ export function MeasurementsPageContent() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="pb-3 font-medium">ID</th>
                     <th className="pb-3 font-medium">Contrato</th>
                     <th className="pb-3 font-medium">Descrição</th>
                     <th className="pb-3 font-medium">Status</th>
@@ -238,9 +237,18 @@ export function MeasurementsPageContent() {
                       className="cursor-pointer border-b transition-colors hover:bg-muted/50 last:border-0"
                       onClick={() => router.push(`/measurements/${measurement.id}`)}
                     >
-                      <td className="py-3 font-medium">#{measurement.id}</td>
-                      <td className="py-3">#{measurement.contract}</td>
-                      <td className="py-3">{measurement.description || "Sem descrição"}</td>
+                      <td className="py-3">
+                        {(() => {
+                          const t = measurement.contract_title ?? `#${measurement.contract}`
+                          return t.length > 45 ? `${t.slice(0, 45)}...` : t
+                        })()}
+                      </td>
+                      <td className="py-3">
+                        {(() => {
+                          const d = measurement.description || "Sem descrição"
+                          return d.length > 20 ? `${d.slice(0, 20)}...` : d
+                        })()}
+                      </td>
                       <td className="py-3">
                         <Badge
                           variant={measurement.status === "APPROVED" ? "default" : "secondary"}

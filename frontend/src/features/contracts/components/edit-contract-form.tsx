@@ -6,7 +6,7 @@ import { useEffect, useState } from "react"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { getContract, updateContract } from "@/services/api/contracts"
+import { getContract, updateContract, uploadContractAttachments } from "@/services/api/contracts"
 
 interface EditContractFormProps {
   contractId: string
@@ -20,6 +20,11 @@ interface ContractFormState {
   start_date: string
   end_date: string
   status: "ACTIVE" | "CLOSED"
+  numero_contrato: string
+  empresa_contratante: string
+  empresa_contratada: string
+  cnpj_empresa_contratada: string
+  cnpj_empresa_contratante: string
 }
 
 function parseMoneyInput(value: string): number | null {
@@ -49,6 +54,7 @@ function parseMoneyInput(value: string): number | null {
 export function EditContractForm({ contractId }: EditContractFormProps) {
   const router = useRouter()
   const [formData, setFormData] = useState<ContractFormState | null>(null)
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -70,6 +76,11 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
           start_date: contract.start_date,
           end_date: contract.end_date,
           status: contract.status,
+          numero_contrato: contract.numero_contrato ?? "",
+          empresa_contratante: contract.empresa_contratante ?? "",
+          empresa_contratada: contract.empresa_contratada ?? "",
+          cnpj_empresa_contratada: contract.cnpj_empresa_contratada ?? "",
+          cnpj_empresa_contratante: contract.cnpj_empresa_contratante ?? "",
         })
       } catch (loadError) {
         setError(
@@ -93,7 +104,6 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
       if (!previousState) {
         return previousState
       }
-
       return {
         ...previousState,
         [name]: value,
@@ -115,6 +125,11 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
       return
     }
 
+    if (formData.start_date && formData.end_date && formData.end_date < formData.start_date) {
+      setError("A data de fim não pode ser anterior à data de início.")
+      return
+    }
+
     try {
       setIsSubmitting(true)
 
@@ -126,7 +141,16 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
         start_date: formData.start_date,
         end_date: formData.end_date,
         status: formData.status,
+        numero_contrato: formData.numero_contrato || undefined,
+        empresa_contratante: formData.empresa_contratante || undefined,
+        empresa_contratada: formData.empresa_contratada || undefined,
+        cnpj_empresa_contratada: formData.cnpj_empresa_contratada || undefined,
+        cnpj_empresa_contratante: formData.cnpj_empresa_contratante || undefined,
       })
+
+      if (additionalFiles.length > 0) {
+        await uploadContractAttachments(Number(contractId), additionalFiles)
+      }
 
       router.push(`/contracts/${contractId}`)
     } catch (submitError) {
@@ -159,7 +183,9 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
     <div className="space-y-6">
       <section className="rounded-2xl border bg-card p-6 shadow-sm">
         <h2 className="text-2xl font-semibold tracking-tight">Editar contrato</h2>
-        <p className="text-sm text-muted-foreground">Atualize os dados do contrato selecionado.</p>
+        <p className="text-sm text-muted-foreground">
+          Atualize os dados do contrato selecionado.
+        </p>
       </section>
 
       <Card className="shadow-sm">
@@ -169,7 +195,8 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
 
         <CardContent>
           <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {/* Linha 1: Título, Número, Datas */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <label className="space-y-2">
                 <span className="text-sm font-medium">Título *</span>
                 <input
@@ -178,58 +205,19 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
                   value={formData.title}
                   onChange={handleFieldChange}
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  placeholder="Ex.: Contrato de Manutenção Predial"
                 />
               </label>
 
               <label className="space-y-2">
-                <span className="text-sm font-medium">Status</span>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleFieldChange}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="CLOSED">CLOSED</option>
-                </select>
-              </label>
-            </div>
-
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Descrição</span>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleFieldChange}
-                rows={4}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-              />
-            </label>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Valor total *</span>
+                <span className="text-sm font-medium">Número do contrato</span>
                 <input
-                  required
                   type="text"
-                  inputMode="decimal"
-                  name="total_value"
-                  value={formData.total_value}
+                  name="numero_contrato"
+                  value={formData.numero_contrato}
                   onChange={handleFieldChange}
                   className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Manager (ID) opcional</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  name="manager_id"
-                  value={formData.manager_id}
-                  onChange={handleFieldChange}
-                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  placeholder="Ex.: CTR-2024-001"
                 />
               </label>
 
@@ -258,6 +246,141 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
               </label>
             </div>
 
+            {/* Descrição */}
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Descrição</span>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleFieldChange}
+                rows={4}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                placeholder="Detalhes do contrato"
+              />
+            </label>
+
+            {/* Documentos adicionais */}
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Anexar PDFs adicionais</span>
+              <input
+                type="file"
+                accept="application/pdf"
+                multiple
+                onChange={(e) => setAdditionalFiles(Array.from(e.target.files ?? []))}
+                className="h-10 w-full rounded-md border bg-background px-3 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-l-md file:border-0 file:bg-muted file:text-sm file:font-medium hover:file:bg-muted/80"
+              />
+              {additionalFiles.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {additionalFiles.length} arquivo{additionalFiles.length > 1 ? "s" : ""} selecionado{additionalFiles.length > 1 ? "s" : ""}: {additionalFiles.map((f) => f.name).join(", ")}
+                </p>
+              )}
+            </label>
+
+            {/* Valor, Manager, Status */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Valor total *</span>
+                <input
+                  required
+                  type="text"
+                  inputMode="decimal"
+                  name="total_value"
+                  value={formData.total_value}
+                  onChange={handleFieldChange}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  placeholder="Ex.: 50000 ou 50.000,00"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Manager (ID) opcional</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  name="manager_id"
+                  value={formData.manager_id}
+                  onChange={handleFieldChange}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  placeholder="Ex.: 3"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Status</span>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleFieldChange}
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                >
+                  <option value="ACTIVE">Ativo</option>
+                  <option value="CLOSED">Fechado</option>
+                </select>
+              </label>
+            </div>
+
+            {/* Dados das Empresas */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <h3 className="mb-4 font-medium">Dados das Empresas</h3>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Empresa contratada</span>
+                    <input
+                      type="text"
+                      name="empresa_contratada"
+                      value={formData.empresa_contratada}
+                      onChange={handleFieldChange}
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      placeholder="Ex.: Prestadora XYZ S.A."
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">CNPJ contratada</span>
+                    <input
+                      type="text"
+                      name="cnpj_empresa_contratada"
+                      value={formData.cnpj_empresa_contratada}
+                      onChange={handleFieldChange}
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      placeholder="Ex.: 12.345.678/0001-90"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-4 h-6" />
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">Empresa contratante</span>
+                    <input
+                      type="text"
+                      name="empresa_contratante"
+                      value={formData.empresa_contratante}
+                      onChange={handleFieldChange}
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      placeholder="Ex.: Empresa ABC Ltda"
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium">CNPJ contratante</span>
+                    <input
+                      type="text"
+                      name="cnpj_empresa_contratante"
+                      value={formData.cnpj_empresa_contratante}
+                      onChange={handleFieldChange}
+                      className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                      placeholder="Ex.: 98.765.432/0001-10"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
             {error ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
@@ -268,7 +391,10 @@ export function EditContractForm({ contractId }: EditContractFormProps) {
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? "Salvando..." : "Salvar alterações"}
               </Button>
-              <Link href={`/contracts/${contractId}`} className={buttonVariants({ variant: "outline" })}>
+              <Link
+                href={`/contracts/${contractId}`}
+                className={buttonVariants({ variant: "outline" })}
+              >
                 Cancelar
               </Link>
             </div>

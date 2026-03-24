@@ -1,6 +1,22 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Contract, Measurement, Payment, AuditLog
+from .models import Contract, Measurement, Payment, AuditLog, Attachment
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.SerializerMethodField(read_only=True)
+    file_name = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Attachment
+        fields = ['id', 'file', 'file_name', 'uploaded_by_name', 'created_at']
+        read_only_fields = ['id', 'uploaded_by_name', 'created_at']
+
+    def get_uploaded_by_name(self, obj):
+        return obj.uploaded_by.get_full_name() or obj.uploaded_by.username
+
+    def get_file_name(self, obj):
+        return obj.file.name.split('/')[-1] if obj.file else None
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -42,6 +58,11 @@ class ContractSerializer(serializers.ModelSerializer):
             "start_date",
             "end_date",
             "status",
+            "numero_contrato",
+            "empresa_contratante",
+            "empresa_contratada",
+            "cnpj_empresa_contratada",
+            "cnpj_empresa_contratante",
             "manager",
             "manager_id",
             "created_at",
@@ -110,7 +131,7 @@ class ContractSerializer(serializers.ModelSerializer):
 
 
 class MeasurementSerializer(serializers.ModelSerializer):
-    """Serializer para o modelo Measurement.
+    """ Serializer para o modelo Measurement.
 
     Validações:
     - value não pode ser negativo
@@ -122,18 +143,26 @@ class MeasurementSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    approved_by_name = serializers.SerializerMethodField(read_only=True)
+    rejected_by_name = serializers.SerializerMethodField(read_only=True)
+    contract_title = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Measurement
         fields = [
             "id",
             "contract",
+            "contract_title",
             "created_by",
             "description",
             "value",
+            "start_date",
+            "end_date",
             "status",
             "approved_at",
+            "approved_by_name",
             "rejected_at",
+            "rejected_by_name",
             "created_at",
             "updated_at",
         ]
@@ -142,9 +171,31 @@ class MeasurementSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "approved_at",
+            "approved_by_name",
             "rejected_at",
+            "rejected_by_name",
+            "contract_title",
             "status",
         )
+
+    def get_contract_title(self, obj):
+        return obj.contract.title if obj.contract else None
+
+    def get_approved_by_name(self, obj):
+        if obj.approved_by:
+            full = f"{obj.approved_by.first_name} {
+                obj.approved_by.last_name}".strip()
+
+            return full or obj.approved_by.username
+        return None
+
+    def get_rejected_by_name(self, obj):
+        if obj.rejected_by:
+            full = f"{obj.rejected_by.first_name} {
+                obj.rejected_by.last_name}".strip()
+
+            return full or obj.rejected_by.username
+        return None
 
     def validate_value(self, value):
         """Garante que o valor da medição é positivo."""
@@ -205,6 +256,15 @@ class MeasurementSerializer(serializers.ModelSerializer):
                     "where you are the manager"
                 )
 
+        # Valida que data de fim não é anterior à data de início
+        start = data.get("start_date")
+        end = data.get("end_date")
+        if start and end and end < start:
+            raise serializers.ValidationError(
+                "A data de fim da medição não "
+                "pode ser anterior à data de início."
+            )
+
         return data
 
     def create(self, validated_data):
@@ -230,7 +290,8 @@ class MeasurementSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
-    """Serializer para o modelo Payment.
+    """
+    Serializer para o modelo Payment.
 
     Validações:
     - amount não pode ser negativo
@@ -248,17 +309,27 @@ class PaymentSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True
     )
+    contract_title = serializers.SerializerMethodField(read_only=True)
+    measurement_description = serializers.SerializerMethodField(read_only=True)
+    anexo_nota_fiscal_url = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Payment
         fields = [
             "id",
             "contract",
+            "contract_title",
             "measurement",
+            "measurement_description",
             "created_by",
             "amount",
             "status",
             "paid_at",
+            "numero_nota_fiscal",
+            "data_emissao_nota",
+            "valor_nota_fiscal",
+            "anexo_nota_fiscal",
+            "anexo_nota_fiscal_url",
             "created_at",
             "updated_at",
         ]
@@ -268,7 +339,22 @@ class PaymentSerializer(serializers.ModelSerializer):
             "updated_at",
             "paid_at",
             "status",
+            "contract_title",
+            "measurement_description",
+            "anexo_nota_fiscal_url",
         )
+
+    def get_contract_title(self, obj):
+        return obj.contract.title if obj.contract else None
+
+    def get_measurement_description(self, obj):
+        return obj.measurement.description if obj.measurement else None
+
+    def get_anexo_nota_fiscal_url(self, obj):
+        request = self.context.get('request')
+        if obj.anexo_nota_fiscal and request:
+            return request.build_absolute_uri(obj.anexo_nota_fiscal.url)
+        return None
 
     def validate_amount(self, value):
         """Garante que o valor do pagamento é positivo."""

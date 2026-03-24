@@ -99,9 +99,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   const method = (init?.method ?? "GET").toUpperCase()
   const buildHeaders = () => {
     const headers = new Headers(init?.headers)
-    const hasBody = init?.body !== undefined && init?.body !== null
+    const body = init?.body
+    const hasBody = body !== undefined && body !== null
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData
 
-    if (hasBody && !headers.has("Content-Type")) {
+    if (hasBody && !headers.has("Content-Type") && !isFormData) {
       headers.set("Content-Type", "application/json")
     }
 

@@ -37,7 +37,10 @@ function formatDate(value: string | null) {
     return "-"
   }
 
-  const parsedDate = new Date(value)
+  // Datas puras (YYYY-MM-DD) devem ser tratadas como local, não UTC
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  const parsedDate = dateOnly ? new Date(`${value}T00:00:00`) : new Date(value)
+
   if (Number.isNaN(parsedDate.getTime())) {
     return value
   }
@@ -47,14 +50,14 @@ function formatDate(value: string | null) {
 
 function formatMeasurementStatusLabel(status: MeasurementSummary["status"]) {
   if (status === "APPROVED") {
-    return "aprovada"
+    return "Aprovada"
   }
 
   if (status === "REJECTED") {
-    return "rejeitada"
+    return "Rejeitada"
   }
 
-  return "pendente"
+  return "Pendente"
 }
 
 export function MeasurementDetailPageContent({ measurementId }: MeasurementDetailPageContentProps) {
@@ -188,12 +191,12 @@ export function MeasurementDetailPageContent({ measurementId }: MeasurementDetai
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm text-muted-foreground">Medição #{measurement.id}</p>
-            <h2 className="text-2xl font-semibold tracking-tight">Contrato #{measurement.contract}</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">{measurement.contract_title ?? `Contrato #${measurement.contract}`}</h2>
           </div>
 
           <div className="flex items-center gap-2">
             <Badge variant={measurement.status === "APPROVED" ? "default" : "secondary"}>
-              {measurement.status}
+              {formatMeasurementStatusLabel(measurement.status)}
             </Badge>
             {canEditMeasurement ? (
               <>
@@ -244,7 +247,7 @@ export function MeasurementDetailPageContent({ measurementId }: MeasurementDetai
 
       {!canEditMeasurement ? (
         <div className="rounded-lg border border-muted bg-muted/40 p-3 text-sm text-muted-foreground">
-          Esta medição está {measurement.status} e não pode mais ser editada.
+          Esta medição está {formatMeasurementStatusLabel(measurement.status)} e não pode mais ser editada.
         </div>
       ) : null}
 
@@ -253,28 +256,62 @@ export function MeasurementDetailPageContent({ measurementId }: MeasurementDetai
           <CardTitle>Informações da medição</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Datas de vigência */}
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <p className="text-xs text-muted-foreground">Valor</p>
-              <p className="text-sm font-medium">{formatMoney(measurement.value)}</p>
+              <p className="text-xs text-muted-foreground">Início</p>
+              <p className="text-sm font-medium">{formatDate(measurement.start_date)}</p>
             </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Fim</p>
+              <p className="text-sm font-medium">{formatDate(measurement.end_date)}</p>
+            </div>
+          </div>
+
+          {/* Valor */}
+          <div>
+            <p className="text-xs text-muted-foreground">Valor</p>
+            <p className="text-sm font-medium">{formatMoney(measurement.value)}</p>
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <p className="text-xs text-muted-foreground">Descrição</p>
+            <p className="text-sm">{measurement.description || "Sem descrição"}</p>
+          </div>
+
+          {/* Datas de controle */}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 border-t pt-4">
             <div>
               <p className="text-xs text-muted-foreground">Criada em</p>
               <p className="text-sm font-medium">{formatDate(measurement.created_at)}</p>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Aprovada em</p>
-              <p className="text-sm font-medium">{formatDate(measurement.approved_at)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Rejeitada em</p>
-              <p className="text-sm font-medium">{formatDate(measurement.rejected_at)}</p>
-            </div>
-          </div>
 
-          <div>
-            <p className="text-xs text-muted-foreground">Descrição</p>
-            <p className="text-sm">{measurement.description || "Sem descrição"}</p>
+            {measurement.status === "APPROVED" && (
+              <>
+                <div>
+                  <p className="text-xs text-muted-foreground">Aprovada em</p>
+                  <p className="text-sm font-medium">{formatDate(measurement.approved_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Aprovada por</p>
+                  <p className="text-sm font-medium">{measurement.approved_by_name ?? "-"}</p>
+                </div>
+              </>
+            )}
+
+            {measurement.status === "REJECTED" && (
+              <>
+                <div>
+                  <p className="text-xs text-muted-foreground">Rejeitada em</p>
+                  <p className="text-sm font-medium">{formatDate(measurement.rejected_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Rejeitada por</p>
+                  <p className="text-sm font-medium">{measurement.rejected_by_name ?? "-"}</p>
+                </div>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

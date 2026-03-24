@@ -169,7 +169,11 @@ export function ContractsPageContent() {
                       className="cursor-pointer border-b transition-colors hover:bg-muted/50 last:border-0"
                       onClick={() => router.push(`/contracts/${contract.id}`)}
                     >
-                      <td className="py-3 font-medium">{contract.title}</td>
+                      <td className="py-3 font-medium">
+                        {contract.title.length > 42
+                          ? `${contract.title.slice(0, 42)}...`
+                          : contract.title}
+                      </td>
                       <td className="py-3">{getManagerName(contract)}</td>
                       <td className="py-3">
                         <Badge variant={contract.status === "ACTIVE" ? "default" : "secondary"}>

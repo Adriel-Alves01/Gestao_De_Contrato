@@ -4,20 +4,28 @@ from rest_framework.permissions import IsAuthenticated, BasePermission
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from rest_framework.filters import SearchFilter
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.http import FileResponse
 
-from .models import Contract, Measurement, Payment, AuditLog
+from .models import Contract, Measurement, Payment, AuditLog, Attachment
 from .serializers import (
     ContractSerializer,
     MeasurementSerializer,
     PaymentSerializer,
     UserSerializer,
     AuditLogSerializer,
+    AttachmentSerializer,
 )
+from .ai import (
+    extract_contract_data_from_pdf,
+    extract_nf_data,
+    ClaudeExtractionError,
+)
+from decimal import Decimal, InvalidOperation
 from .services import (
     ContractService,
     MeasurementService,
@@ -237,6 +245,77 @@ class ContractViewSet(viewsets.ModelViewSet):
 
         notify_contract_created(instance, self.request.user)
 
+    @action(
+        detail=False,
+        methods=("post",),
+        url_path="extract-from-pdf",
+        parser_classes=(MultiPartParser, FormParser),
+        permission_classes=(IsAuthenticated,),
+    )
+    def extract_from_pdf(self, request):
+        """Extrai dados do contrato a partir de um PDF usando IA."""
+        file = request.FILES.get("file")
+        if not file:
+            return error_response(
+                "O campo 'file' é obrigatório (PDF).",
+                status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            extracted = extract_contract_data_from_pdf(file)
+            return Response(extracted, status=status.HTTP_200_OK)
+        except ClaudeExtractionError as e:
+            return error_response(str(e), status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return error_response(
+                f"Erro ao extrair dados do PDF: {str(e)}",
+                status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(
+        detail=True,
+        methods=("post",),
+        url_path="attachments",
+        parser_classes=(MultiPartParser, FormParser),
+        permission_classes=(IsAuthenticated,),
+    )
+    def upload_attachments(self, request, pk=None):
+        """Faz upload de um ou mais
+        arquivos adicionais vinculados ao contrato."""
+        contract = self.get_object()
+        files = request.FILES.getlist("files")
+
+        if not files:
+            return error_response(
+                "Nenhum arquivo enviado.", status.HTTP_400_BAD_REQUEST)
+
+        created = []
+        for f in files:
+            attachment = Attachment.objects.create(
+                contract=contract,
+                file=f,
+                uploaded_by=request.user,
+            )
+            created.append(attachment)
+
+        serializer = AttachmentSerializer(
+            created, many=True, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=True,
+        methods=("get",),
+        url_path="attachments/list",
+        permission_classes=(IsAuthenticated,),
+    )
+    def list_attachments(self, request, pk=None):
+        """Lista todos os anexos de um contrato."""
+        contract = self.get_object()
+        attachments = contract.attachments.order_by("-created_at")
+        serializer = AttachmentSerializer(
+            attachments, many=True, context={"request": request})
+        return Response(serializer.data)
+
     @action(detail=True, methods=("post",), url_path="close")
     def close(self, request, pk=None):
         """
@@ -423,6 +502,18 @@ class MeasurementViewSet(viewsets.ModelViewSet):
         return context
 
     def perform_create(self, serializer):
+        contract = serializer.validated_data.get('contract')
+        value = serializer.validated_data.get('value')
+        if (
+            contract
+            and value is not None
+            and value > contract.remaining_balance
+        ):
+            raise ValidationError(
+                f"O valor da medição (R$ {
+                    value}) é maior que o saldo restante "
+                f"do contrato (R$ {contract.remaining_balance})."
+            )
         instance = serializer.save()
         notify_measurement_created(instance, self.request.user)
 
@@ -731,6 +822,31 @@ class PaymentViewSet(viewsets.ModelViewSet):
                 status.HTTP_403_FORBIDDEN,
             )
 
+        # Salva campos da Nota Fiscal antes de marcar como pago
+        numero_nf = request.data.get('numero_nota_fiscal') or None
+        data_emissao = request.data.get('data_emissao_nota') or None
+        valor_nf_raw = request.data.get('valor_nota_fiscal') or None
+        anexo_nf = request.FILES.get('anexo_nota_fiscal') or None
+
+        valor_nf = None
+        if valor_nf_raw:
+            try:
+                valor_nf = Decimal(str(valor_nf_raw).replace(',', '.'))
+            except InvalidOperation:
+                pass
+
+        if numero_nf is not None:
+            payment.numero_nota_fiscal = numero_nf
+        if data_emissao is not None:
+            payment.data_emissao_nota = data_emissao
+        if valor_nf is not None:
+            payment.valor_nota_fiscal = valor_nf
+        if anexo_nf is not None:
+            payment.anexo_nota_fiscal = anexo_nf
+
+        if any([numero_nf, data_emissao, valor_nf, anexo_nf]):
+            payment.save()
+
         try:
             payment = PaymentService.mark_as_paid(payment, request.user)
             contract = payment.contract
@@ -807,6 +923,39 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
         except ValidationError as e:
             return error_response(str(e), status.HTTP_400_BAD_REQUEST)
+
+    @action(
+        detail=False,
+        methods=("post",),
+        url_path="extract-nf",
+        permission_classes=[IsAuthenticated],
+    )
+    def extract_nf(self, request):
+        """
+        Extrai dados de uma Nota Fiscal via IA.
+
+        Recebe um arquivo (PDF ou imagem) via multipart/form-data
+        no campo `arquivo_nf` e retorna os campos extraídos:
+        - numero_nota_fiscal
+        - data_emissao_nota
+        - valor_nota_fiscal
+        """
+        arquivo = request.FILES.get('arquivo_nf')
+        if not arquivo:
+            return error_response(
+                "Campo 'arquivo_nf' é obrigatório.",
+                status.HTTP_400_BAD_REQUEST)
+
+        try:
+            dados = extract_nf_data(arquivo)
+        except Exception as exc:
+            import logging
+            logging.warning(f"Erro ao extrair NF: {exc}")
+            dados = {
+                "numero_nota_fiscal": None, "data_emissao_nota": None,
+                "valor_nota_fiscal": None}
+
+        return Response(dados, status=status.HTTP_200_OK)
 
 
 class IsFinancialOrAdmin(BasePermission):
