@@ -8,8 +8,8 @@ Sistema de **Contract Lifecycle Management** com backend em Django REST e fronte
 - Swagger/OpenAPI: `https://gestao-de-contrato-api.onrender.com/api/docs/`
 
 ### Acesso de demonstração
-- Usuário: **Usuario_Teste**
-- Senha: **Teste124**
+- Usuário: **usuario-teste**
+- Senha: **12374test**
 
 > Se o serviço estiver em plano free, o primeiro acesso pode demorar alguns segundos (cold start).
 
