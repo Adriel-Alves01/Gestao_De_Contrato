@@ -184,14 +184,12 @@ CAMPOS OBRIGATÓRIOS NO JSON:
 CONTRATO:
 {text}"""
 
+    import logging as _logging
     if OPENAI_API_KEY:
         try:
             completion_text = _extract_with_openai(text, OPENAI_API_KEY)
         except Exception as e:
-            import logging
-            logging.warning(
-                f"OpenAI falhou: {e}. Tentando Gemini..."
-            )
+            _logging.exception(f"[AI] OpenAI falhou: {e}")
             # Fallback para Gemini se OpenAI falhar
             if GOOGLE_API_KEY and GOOGLE_API_KEY != 'your-google-api-key-here':
                 try:
@@ -201,10 +199,17 @@ CONTRATO:
                         contents=prompt
                     )
                     completion_text = response.text
-                except Exception:
-                    completion_text = _extract_mock_data(text)
+                except Exception as e2:
+                    _logging.exception(f"[AI] Gemini falhou: {e2}")
+                    raise ClaudeExtractionError(
+                        f"OpenAI falhou ({e}) e Gemini falhou ({e2}). "
+                        "Configure OPENAI_API_KEY ou GOOGLE_API_KEY."
+                    )
             else:
-                completion_text = _extract_mock_data(text)
+                raise ClaudeExtractionError(
+                    f"OpenAI falhou: {e}. "
+                    "Configure OPENAI_API_KEY ou GOOGLE_API_KEY no servidor."
+                )
     elif GOOGLE_API_KEY and GOOGLE_API_KEY != 'your-google-api-key-here':
         try:
             client = genai.Client(api_key=GOOGLE_API_KEY)
@@ -213,10 +218,16 @@ CONTRATO:
                 contents=prompt
             )
             completion_text = response.text
-        except Exception:
-            completion_text = _extract_mock_data(text)
+        except Exception as e:
+            _logging.exception(f"[AI] Gemini falhou: {e}")
+            raise ClaudeExtractionError(
+                f"Gemini falhou: {e}. Configure GOOGLE_API_KEY corretamente."
+            )
     else:
-        completion_text = _extract_mock_data(text)
+        raise ClaudeExtractionError(
+            "Nenhuma API configurada. "
+            "Defina OPENAI_API_KEY ou GOOGLE_API_KEY no servidor."
+        )
 
     extracted = _extract_json_payload(completion_text)
 
