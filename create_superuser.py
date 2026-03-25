@@ -11,21 +11,33 @@ from django.contrib.auth.models import Group  # noqa: E402
 
 User = get_user_model()
 
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'admin')
-    print('superuser criado: admin/admin')
+# Superuser - credenciais via variaveis de ambiente
+su_user = os.getenv('DJANGO_SUPERUSER_USERNAME', 'admin')
+su_email = os.getenv('DJANGO_SUPERUSER_EMAIL', 'admin@example.com')
+su_pass = os.getenv('DJANGO_SUPERUSER_PASSWORD')
+
+if su_pass and not User.objects.filter(username=su_user).exists():
+    User.objects.create_superuser(su_user, su_email, su_pass)
+    print(f'superuser criado: {su_user}')
+elif not su_pass:
+    print('AVISO: DJANGO_SUPERUSER_PASSWORD nao definida, superuser nao criado')
 else:
-    print('superuser ja existe: admin')
+    print(f'superuser ja existe: {su_user}')
 
 # Usuario de demonstracao com perfil GESTOR
-u, created = User.objects.get_or_create(username='Usuario_Teste')
-if created:
-    u.set_password('Teste124')
-    u.save()
-    print('usuario demo criado: Usuario_Teste/Teste124')
-else:
-    print('usuario demo ja existe: Usuario_Teste')
+demo_user = os.getenv('DEMO_USERNAME', 'Usuario_Teste')
+demo_pass = os.getenv('DEMO_PASSWORD')
 
-gestor_group, _ = Group.objects.get_or_create(name='GESTOR')
-u.groups.add(gestor_group)
-print('grupo GESTOR atribuido ao Usuario_Teste')
+if demo_pass:
+    u, created = User.objects.get_or_create(username=demo_user)
+    if created:
+        u.set_password(demo_pass)
+        u.save()
+        print(f'usuario demo criado: {demo_user}')
+    else:
+        print(f'usuario demo ja existe: {demo_user}')
+    gestor_group, _ = Group.objects.get_or_create(name='GESTOR')
+    u.groups.add(gestor_group)
+    print(f'grupo GESTOR atribuido a {demo_user}')
+else:
+    print('AVISO: DEMO_PASSWORD nao definida, usuario demo nao criado')
