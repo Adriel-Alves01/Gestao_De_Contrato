@@ -1,6 +1,20 @@
-# Gestão de Contratos (CLM)
+﻿# Gestão de Contratos (CLM)
 
-Sistema de **Contract Lifecycle Management** com backend em Django REST e frontend em Next.js.
+## O que é este sistema?
+
+O **Gestão de Contratos (CLM)** é uma plataforma completa para gerenciar o ciclo de vida de contratos de forma organizada, segura e rastreável.
+
+Na prática, ele foi criado para que empresas possam **controlar cada etapa de um contrato**: desde o momento em que ele é cadastrado, passando pelo acompanhamento de medições (execução parcial do que foi contratado), até os pagamentos feitos ao fornecedor — tudo com histórico, regras de aprovação e controle por perfil de usuário.
+
+### Para que serve?
+- **Gestor de contratos** cadastra e acompanha os contratos, define prazos, valores e partes envolvidas (CNPJ, razão social).
+- **Fornecedor** registra as medições (o que foi entregue/executado no período).
+- **Financeiro** aprova as medições e processa os pagamentos com emissão de Nota Fiscal.
+- **Admin** tem visão total do sistema, gerencia usuários e audita ações.
+
+O sistema também conta com **extração automática de dados via Inteligência Artificial**: ao fazer upload de um PDF de contrato ou nota fiscal, a IA lê o documento e preenche os campos automaticamente, poupando tempo de digitação.
+
+Construído com backend em **Django REST** e frontend em **Next.js**.
 
 ## Demo online
 - Frontend (Vercel): **https://gestao-de-contrato.vercel.app**
